@@ -4,9 +4,15 @@
 
 ## Overview
 
+Entry for Gitcoin Bounty:
+https://gitcoin.co/issue/snxgrants/open-defi-hackathon/8/100025689
+
 This is the first dApp + Smart Contract I have ever coded so please be nice and I welcome any and all feedback to help me get better.  This was a lot of fun to work on because it touched a lot of different smart contract concepts which were challenging to learn.
 
 My goal with this development was to make a lottery system that is as permanent, reliable, and self-sustainable as possible.  That means that no administrative activities should be required to keep the lottery operating indefinitely.
+
+Check out the lottery in action on the Kovan network here:
+https://synthetixlottery.netlify.app/
 
 ## Features
 
@@ -41,7 +47,7 @@ Prizes are awarded as follows:
 
 Significant effort went into attempting to optimize gas usage, to avoid having gas fees be more expensive than the lottery ticket itself.
 
-For this reason, the contract does not keep track of past lotteries or winners after they have claimed their prizes, but that information could be displayed by tracking the contracts events.  Instead of tracking individual lotteries with an ID which increased contract size and gas fees, this contract tracks lotteries by their ticket id "floor".
+For this reason, the contract does not keep track of past lotteries or winners after they have claimed their prizes, but that information could be displayed by tracking the contract's events.  Instead of tracking individual lotteries with an ID which increased contract size and gas fees, this contract tracks lotteries by their ticket id "floor".
 
 Valid tickets for the *current* lottery could be expressed as:
 
