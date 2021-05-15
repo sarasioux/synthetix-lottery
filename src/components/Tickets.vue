@@ -14,11 +14,13 @@
 
             <div class="tickets" v-if="showTickets === 'current'">
                 <div class="columns is-multiline">
-                    <div class="column is-6" v-for="ticket in currentTickets" :key="ticket">
+                    <div class="column is-4" v-for="ticket in currentTickets" :key="ticket">
                         <TicketCard
                                 :contract="contract"
                                 :ticketId="ticket"
                                 :account="account"
+                                :ticketFloor="ticketFloor"
+                                :prevTicketFloor="prevTicketFloor"
                         />
                     </div>
                     <div class="column" v-if="currentTickets.length === 0">
@@ -28,12 +30,23 @@
             </div>
 
             <div class="tickets" v-if="showTickets === 'past'">
+                <div class="burn-button has-text-centered" v-if="pastTickets.length > 0">
+                    <button class="button" @click="burnTickets" :disabled="burnInProgress">
+                        <span class="icon">
+                            <i class="fas fa-fire" v-if="!burnInProgress"></i>
+                            <i class="fab fas fa-spinner fa-pulse" v-if="burnInProgress"></i>
+                        </span>
+                        <span>Burn Expired Tickets</span>
+                    </button>
+                </div>
                 <div class="columns is-multiline">
-                    <div class="column is-6" v-for="ticket in pastTickets" :key="ticket">
+                    <div class="column is-4" v-for="ticket in pastTickets" :key="ticket">
                         <TicketCard
                                 :contract="contract"
                                 :ticketId="ticket"
                                 :account="account"
+                                :ticketFloor="ticketFloor"
+                                :prevTicketFloor="prevTicketFloor"
                         />
                     </div>
                     <div class="column" v-if="pastTickets.length === 0">
@@ -59,10 +72,12 @@
                 showTickets: 'current',
                 currentLotteryId: 0,
                 ticketFloor: 0,
+                prevTicketFloor: 0,
                 lottery: {},
                 tickets: [],
                 currentTickets: [],
                 pastTickets: [],
+                burnInProgress: false
             }
         },
         props: {
@@ -85,6 +100,7 @@
             loadTickets: async function() {
                 this.loaded = false;
                 this.ticketFloor = parseInt(await this.contract.ticketFloor.call({from: this.account}));
+                this.prevTicketFloor = parseInt(await this.contract.prevTicketFloor.call({from: this.account}));
                 this.tickets = await this.contract.getMyTickets({from: this.account});
                 this.tickets = this.tickets.reverse();
                 this.currentTickets = [];
@@ -99,6 +115,12 @@
                     }
                 }
                 this.loaded=true;
+            },
+            burnTickets: async function() {
+                this.burnInProgress = true;
+                await this.contract.burnExpired({from: this.account});
+                this.burnInProgress = false;
+                this.loadTickets();
             }
         }
     }
@@ -109,13 +131,9 @@
     .panel {
         transition: 1s;
     }
-    .winners-box,
     .tickets,
     .tickets .columns {
         width: 100%;
-    }
-    .winners-box {
-        margin: 1em 0.9em;
     }
     .tickets {
         padding: 1.5em 0 1.5em 1.5em;
@@ -124,5 +142,8 @@
     }
     p.empty {
         padding: 0 1em;
+    }
+    .burn-button {
+        padding-bottom: 1.5em;
     }
 </style>

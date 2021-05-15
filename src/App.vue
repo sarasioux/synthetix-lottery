@@ -112,6 +112,8 @@
                     this.initContracts();
                     this.connectionInProgress = false;
 
+                    //this.eventFind();
+
                 } catch (error) {
                     // User denied account access
                     console.log('did not receive accts', error);
@@ -149,6 +151,9 @@
                 this.refreshTix = Date.now();
                 this.refreshPrizes = Date.now();
                 this.refreshDebug = Date.now();
+            },
+            eventFind: function() {
+
             }
         }
     }

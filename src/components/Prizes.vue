@@ -12,7 +12,7 @@
                     </div>
                     <div class="column">
                         <div class="subtitle is-6 has-text-dark">Unclaimed Prizes</div>
-                        <div class="title is-2 has-text-dark has-text-weight-bold is-fat">{{unclaimedPrizes}} sUSD</div>
+                        <div class="title is-2 has-text-dark has-text-weight-bold is-fat">{{unclaimedPrizes / ethMultiplier}} sUSD</div>
                     </div>
                     <div class="column has-text-right">
                         <button class="button is-success is-large" @click="claimPrizes">
@@ -35,7 +35,8 @@ export default {
     data: () => {
         return {
             tickets: [],
-            unclaimedPrizes: 0
+            unclaimedPrizes: 0,
+            ethMultiplier: 1000000000000000000
         }
     },
     props: {
@@ -66,6 +67,7 @@ export default {
                 }
                 this.unclaimedPrizes = unclaimedPrizes;
             }
+
         },
         claimPrizes: async function() {
             await this.contract.claimMyPrizes({from: this.account});

@@ -1,29 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.2 <0.9.0;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@chainlink/contracts/src/v0.8/dev/VRFConsumerBase.sol";
 import 'synthetix/contracts/interfaces/IAddressResolver.sol';
 import 'synthetix/contracts/interfaces/IERC20.sol';
 
-/*
-Optimizations:
-- Removed _transferMoney function
-- Moved pickWinners back into the fulfillRandomness function
-*/
-
-contract LotteryTicket is ERC721, VRFConsumerBase, Ownable {
+contract LotteryTicket is ERC721Burnable, VRFConsumerBase, Ownable {
     using SafeMath for uint256;
 
     // Lottery settings
-    uint256 public constant ticketPrice = 5;
+    uint256 public constant ticketPrice = 5 * 1000000000000000000;
     uint256 public constant duration = 10 minutes;
-
-    // sUSD token interfaces
-    IAddressResolver public synthetixResolver;
-    address public synthAddress;
+    uint256 public constant lotteryFee = 10;  // 1%
 
     // Ticket NFT
     uint256 public ticketId;
@@ -35,18 +26,24 @@ contract LotteryTicket is ERC721, VRFConsumerBase, Ownable {
     // End date for current lottery
     uint256 public end;
 
-    // Leftover funds owned by the contract
-    uint256 public contractMoney;
+    // Lottery fees collected
+    uint256 public feesCollected;
 
     // Randomness management
-    bytes32 public requestId;
     bytes32 internal keyHash;
     uint256 internal fee;
+
+    // sUSD token interfaces
+    IAddressResolver public synthetixResolver;
+    address private synthAddress;
 
     // Track prizes
     mapping (uint256 => uint256) public ticketToPrize;
 
+    // Events
     event LotteryEnded(uint256 ticketFloor, bytes32 requestId);
+    event PrizePaid(uint256 indexed ticketId, uint256 indexed prize);
+    event TicketBurned(uint256 indexed ticketId);
 
     /**
      * Start the lottery process with verified randomness and sUSD transactions.
@@ -101,7 +98,7 @@ contract LotteryTicket is ERC721, VRFConsumerBase, Ownable {
         ticketFloor = ticketId;
 
         // Request our randomness
-        requestId = getRandomNumber(block.timestamp);
+        bytes32 requestId = getRandomNumber(block.timestamp);
         emit LotteryEnded(prevTicketFloor, requestId);
     }
 
@@ -114,11 +111,10 @@ contract LotteryTicket is ERC721, VRFConsumerBase, Ownable {
     }
 
     /**
-     * Processes random response, required by VRFCoordinator.
+     * Processes random response, override function required by VRFCoordinator.
      */
     function fulfillRandomness(bytes32 _requestId, uint256 randomness) internal override {
         pickWinners(prevTicketFloor,ticketFloor,randomness);
-        requestId = 0;
     }
 
     /**
@@ -135,8 +131,13 @@ contract LotteryTicket is ERC721, VRFConsumerBase, Ownable {
             resultIndex++;
         }
 
-        // Calculate prize pool and adjust splits depending on entrants
+        // Calculate prize pool and save some money for lottery fees
         uint256 totalPrize = tickets.length * ticketPrice;
+        uint256 take = totalPrize.mul(lotteryFee).div(1000);
+        feesCollected += take;
+        totalPrize = totalPrize - take;
+
+        // Adjust splits depending on entrants
         uint8[3] memory splits;
         if(tickets.length == 0) {
             return true;
@@ -150,12 +151,12 @@ contract LotteryTicket is ERC721, VRFConsumerBase, Ownable {
 
         // Pick the winners
         uint256 selection;
-        uint256 totalPaid;
         for(i=0; i<splits.length; i++) {
             if(splits[i] > 0) {
-                selection = uint256(keccak256(abi.encode(randomness, i))).mod(tickets.length);
+                // Select the winning ticket
+                selection = uint256(keccak256(abi.encode(randomness, i))).mod(tickets.length.sub(1));
                 ticketToPrize[tickets[selection]] = totalPrize.mul(splits[i]).div(100);
-                totalPaid += ticketToPrize[tickets[selection]];
+                emit PrizePaid(tickets[selection], ticketToPrize[tickets[selection]]);
 
                 // Delete the winner and rearrange the tickets so there's 1 less so a ticket doesn't win twice
                 if(tickets.length > 2 || (tickets.length == 2 && selection != tickets.length.sub(1))) {
@@ -168,33 +169,30 @@ contract LotteryTicket is ERC721, VRFConsumerBase, Ownable {
             }
         }
 
-        // Save leftovers for ourself, to pay for the LINK
-        if(totalPaid != totalPrize) {
-            contractMoney += (totalPrize.sub(totalPaid));
-        }
         return true;
     }
 
     /**
-     * Claim my prizes
+     * Claim my prizes. Once it's claimed we no longer have a record of the prize.
      */
     function claimMyPrizes() external {
         uint256 tokenCount = balanceOf(msg.sender);
         require(tokenCount>0,"You do not own any tickets.");
         uint256 amount;
         for (uint256 t = 1; t <= ticketId; t++) {
-            if (ownerOf(t) == msg.sender) {
+            if (_exists(t) && ownerOf(t) == msg.sender) {
                 amount += ticketToPrize[t];
                 ticketToPrize[t] = 0;
             }
         }
 
         // Transfer money
-        IERC20(synthAddress).transfer(msg.sender, amount);
+        IERC20(synthAddress).transferFrom(address(this), msg.sender, amount);
     }
 
     /**
      * Get my tickets helper function for front-end usability.
+     * Concept borrowed from CryptoKitties.
      */
     function getMyTickets() view public returns(uint256[] memory) {
         uint256 tokenCount = balanceOf(msg.sender);
@@ -205,7 +203,7 @@ contract LotteryTicket is ERC721, VRFConsumerBase, Ownable {
             uint256 totalTickets = ticketId;
             uint256 resultIndex = 0;
             for (uint256 t = 1; t <= totalTickets; t++) {
-                if (ownerOf(t) == msg.sender) {
+                if (_exists(t) && ownerOf(t) == msg.sender) {
                     result[resultIndex] = t;
                     resultIndex++;
                 }
@@ -214,13 +212,36 @@ contract LotteryTicket is ERC721, VRFConsumerBase, Ownable {
         }
     }
 
+
+    /**
+     * Burn expired tickets so they don't show up in your UI or wallet anymore.
+     * It's possible a user could burn tickets before they're paid out, I consider that their loss.
+     * To protect against that change ticketFloor to prevTicketFloor below, but that will cause usability
+     * issues on the front end. Would have to track if a lottery has been paid or not to avoid, increasing
+     * overall contract storage costs.
+     */
+    function burnExpired() external {
+        uint256[] memory tickets = getMyTickets();
+        if(tickets.length > 0) {
+            uint256 i;
+            uint256 _ticketId;
+            for(i=0; i<tickets.length; i++) {
+                _ticketId = tickets[i];
+                if(_ticketId <= ticketFloor && ticketToPrize[_ticketId] == 0) {
+                    _burn(_ticketId);
+                    emit TicketBurned(_ticketId);
+                }
+            }
+        }
+    }
+
     /**
      * Withdraw sUSD so we can convert to LINK and put it back.
      */
     function withdrawMoney() external onlyOwner {
         // Transfer money
-        IERC20(synthAddress).transfer(msg.sender, contractMoney);
-        contractMoney = 0;
+        IERC20(synthAddress).transfer(msg.sender, feesCollected);
+        feesCollected = 0;
     }
 
     /**

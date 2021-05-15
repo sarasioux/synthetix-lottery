@@ -42,14 +42,14 @@
                     <h3 class="title is-3 has-text-dark has-text-weight-bold">{{ticketQty * ticketPrice}} sUSD</h3>
                 </div>
                 <div class="column has-text-right">
-                    <button v-if="allowance >= ticketQty * ticketPrice" class="button is-success" @click="buyTicket" :disabled="purchaseInProgress">
+                    <button v-if="allowance >= ticketQty * ticketPrice * ethMultiplier" class="button is-success" @click="buyTicket" :disabled="purchaseInProgress">
                         <span class="icon">
                             <i class="fab fa-ethereum" v-if="!purchaseInProgress"></i>
                             <i class="fab fas fa-spinner fa-pulse" v-if="purchaseInProgress"></i>
                         </span>
                         <span>Buy Now</span>
                     </button>
-                    <button v-if="allowance < ticketQty * ticketPrice" class="button is-green-dark" @click="getApproval" :disabled="approvalInProgress">
+                    <button v-if="allowance < ticketQty * ticketPrice * ethMultiplier" class="button" @click="getApproval" :disabled="approvalInProgress">
                         <span class="icon">
                             <i class="fab fa-ethereum" v-if="!approvalInProgress"></i>
                             <i class="fab fas fa-spinner fa-pulse" v-if="approvalInProgress"></i>
@@ -59,7 +59,7 @@
                 </div>
             </div>
             <div class="approval-message is-small has-text-grey has-text-centered">
-                You have approved this contract for {{allowance}} sUSD.
+                You have approved this contract for {{allowance / ethMultiplier}} sUSD.
             </div>
         </div>
     </div>
@@ -68,6 +68,7 @@
 <script>
 
     const { SynthetixJs } = require('synthetix-js');
+    import BN from 'bignumber.js';
     import moment from 'moment';
 
     export default {
@@ -86,6 +87,7 @@
                 formattedDate: '',
                 ticketQty: 1,
                 ticketPrice: 5,
+                ethMultiplier: 1000000000000000000,
                 allowance: 0
             }
         },
@@ -105,17 +107,21 @@
         methods: {
             getApproval: async function() {
                 this.approvalInProgress = true;
-                const totalSpend = this.ticketQty * this.ticketPrice;
+                const totalSpend = new BN(this.ticketQty * this.ticketPrice * this.ethMultiplier);
                 const networkId = await this.$web3.eth.net.getId();
 
                 const metaMaskSigner = new SynthetixJs.signers.Metamask();
                 const snxjs = new SynthetixJs({ signer: metaMaskSigner, networkId: networkId }); //uses Metamask signer and default infura.io provider on mainnet
-                let self = this;
-                snxjs.sUSD.approve(this.contract.address, totalSpend)
-                    .then(function(err, response) {
-                        console.log('approval request returned', err, response);
-                        self.checkAllowance();
-                    });
+                await snxjs.sUSD.approve(this.contract.address, String(totalSpend));
+                this.waitForApproval(totalSpend);
+            },
+            waitForApproval: async function(expected) {
+                let allowance = await this.checkAllowance();
+                if(allowance == expected) {
+                    this.approvalInProgress = false;
+                } else {
+                    setTimeout(() => this.waitForApproval(expected), 5000);
+                }
             },
             buyTicket: async function() {
                 this.purchaseInProgress = true;

@@ -1,6 +1,5 @@
 <template>
-    <progress v-if="!loaded" class="progress is-small is-light" max="100">15%</progress>
-    <div v-if="loaded">
+    <div>
         <div class="card" :class="{'has-background-success-light':(prize > 0)}">
             <div class="card-content">
                 <a @click="showModal = true" class="send-icon has-text-grey-lighter">
@@ -23,8 +22,11 @@
                         <h3 class="ticket-meta is-title is-3">
                             <span class="is-fat">TIX</span><span class="has-text-weight-bold">-{{ticketId}}</span>
                         </h3>
-                        <code v-if="prize == 0" class="tag is-light">{{ticketStatus()}}</code>
-                        <span class="tag is-success" v-if="prize > 0">{{ prize }} sUSD</span>
+                        <code v-if="prize == 0 && loaded" class="tag is-light">
+                            {{ isCurrent ? 'Current' : 'Expired' }}
+                        </code>
+                        <progress v-if="!loaded" class="progress is-small is-light" max="100">15%</progress>
+                        <span class="tag is-success" v-if="prize > 0">{{ prize / ethMultiplier }} sUSD</span>
                     </div>
                 </div>
             </div>
@@ -67,16 +69,19 @@
                 lotteryId: 0,
                 prize: 0,
                 isCurrent: false,
-                isPending: false,
 
                 showModal: false,
-                transferAddress: ''
+                transferAddress: '',
+                ethMultiplier: 1000000000000000000,
+
             }
         },
         props: {
             contract: Object,
             ticketId: Number,
             account: String,
+            ticketFloor: Number,
+            prevTicketFloor: Number,
         },
         mounted: function() {
             this.loadTicket();
@@ -84,26 +89,10 @@
         methods: {
             loadTicket: async function() {
                 this.prize = parseInt(await this.contract.ticketToPrize.call(this.ticketId, {from: this.account}));
-                let ticketFloor = parseInt(await this.contract.ticketFloor.call({from: this.account}));
-                let prevTicketFloor = parseInt(await this.contract.prevTicketFloor.call({from: this.account}));
-                //let prevLotteryStatus = parseInt(await this.contract.ticketFloorToRandom.call(prevTicketFloor, {from: this.account}));
-                let prevLotteryStatus = 1;
-
-                if(this.ticketId > ticketFloor) {
+                if(this.ticketId > this.ticketFloor) {
                     this.isCurrent = true;
-                } else if(this.ticketId > prevTicketFloor && prevLotteryStatus !== 1) {
-                    this.isPending = true;
                 }
                 this.loaded = true;
-            },
-            ticketStatus: function() {
-                if(this.isCurrent) {
-                    return 'Current';
-                } else if(this.isPending) {
-                    return 'Pending';
-                } else {
-                    return 'Expired';
-                }
             },
             sendTicket: async function() {
                 // 0xA8a912f12FE9E6638bC0DBad8637672Cc19bcEb9
@@ -121,13 +110,12 @@
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
     .card {
-        transition: 1s;
     }
     .card-content {
         padding: 0.6em 1em;
     }
     .card:hover {
-        background: #fafafa;
+        background: #f6f6f6;
     }
     .send-icon {
         position: absolute;

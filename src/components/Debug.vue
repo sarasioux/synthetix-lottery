@@ -23,16 +23,10 @@
                         <span class="label">Previous Ticket Floor</span> <span class="tag">{{prevTicketFloor}}</span>
                     </p>
                     <p class="panel-block">
-                        <span class="label">Contract Allowance</span> <span class="tag">{{allowance}}</span>
+                        <span class="label">Contract Allowance</span> <span class="tag">{{allowance / ethMultiplier}} sUSD</span>
                     </p>
                     <p class="panel-block">
-                        <span class="label">Contract Money</span> <span class="tag">{{contractMoney}}</span>
-                    </p>
-                    <p class="panel-block">
-                        <span class="label">Ticket0 Balance</span> <span class="tag">{{ticket0}}</span>
-                    </p>
-                    <p class="panel-block">
-                        <span class="label">Request ID</span> <span class="tag">{{requestId}}</span>
+                        <span class="label">Fees Collected</span> <span class="tag">{{feesCollected / ethMultiplier}} sUSD</span>
                     </p>
                 </nav>
             </div>
@@ -60,8 +54,9 @@
                 prevTicketFloor: 0,
                 allowance: 0,
                 ticket0: 0,
-                contractMoney: 0,
+                feesCollected: 0,
                 requestId: 0,
+                ethMultiplier: 1000000000000000000,
             }
         },
         props: {
@@ -82,10 +77,7 @@
                 this.ticketFloor = parseInt(await this.contract.ticketFloor.call({from: this.account}));
                 this.prevTicketFloor = parseInt(await this.contract.prevTicketFloor.call({from: this.account}));
                 this.allowance = parseInt(await this.contract.checkTokenAllowance(this.account, this.contract.address, {from: this.account}));
-                this.contractMoney = parseInt(await this.contract.contractMoney.call({from: this.account}));
-                this.ticket0 = parseInt(await this.contract.ticketToPrize.call(0, {from: this.account}));
-                this.requestId = await this.contract.requestId.call({from: this.account});
-
+                this.feesCollected = parseInt(await this.contract.feesCollected.call({from: this.account}));
             },
             refreshLottery: async function() {
                 await this.contract.endLottery({from: this.account});

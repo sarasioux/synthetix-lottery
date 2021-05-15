@@ -1,3 +1,5 @@
+// These values are duplicated in truffle-config.js
+
 let NETWORKS = {
     rinkeby: {
         id: 4,
