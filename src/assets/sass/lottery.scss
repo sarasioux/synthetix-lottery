@@ -1,0 +1,45 @@
+@charset "utf-8";
+
+@import url('https://fonts.googleapis.com/css?family=Raleway:900');
+@import url('https://fonts.googleapis.com/css?family=Lato:400');
+
+//$family-sans-serif: "Lato", sans-serif;
+
+$green:        hsl(141, 53%,  53%) !default
+$link: $green;
+
+.is-fat {
+    font-family: "Raleway", sans-serif;
+}
+.is-uppercase {
+    text-transform: uppercase;
+}
+
+/*
+$purple: #211e64;
+$green: #D5FF18;
+$grey: #6E7073;
+
+$grey-darker:  #646668;
+$grey-light:  #828487;
+$grey-lighter: #E0E0E1;
+$black:        hsl(0, 0%, 4%) !default
+$scheme-invert: $black !default
+
+$primary: $green;
+$link: $purple;
+$body-background-color: $grey;
+
+$panel-shadow: 0 0.5em 1em -0.125em rgba($scheme-invert, 0.2), 0 0px 0 1px rgba($scheme-invert, 0.02) !default
+$panel-heading-background-color: $grey-darker;
+$panel-heading-color: $grey-lighter;
+
+$box-background-color: $grey-light;
+
+$table-background-color: $grey;
+$table-color: $grey-lighter !default
+$table-head-cell-color: white;
+$table-cell-heading-color: white;
+*/
+
+@import "../../../node_modules/bulma/bulma.sass";

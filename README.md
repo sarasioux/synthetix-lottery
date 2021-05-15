@@ -1,5 +1,7 @@
 # synthetix-lottery
 
+* Put your mnemonic in .secret.
+
 ## Project setup
 ```
 npm install
